@@ -1,0 +1,57 @@
+#
+# PREREQUISITE: the Strimzi Cluster Operator itself must already be installed in this
+# cluster/namespace before applying this file -- it is a cluster-scoped operator with
+# its own CRDs and RBAC, typically installed once by a platform team (Helm chart
+# `strimzi-kafka-operator`, or `kubectl apply -f 'https://strimzi.io/install/latest?namespace=<ns>'`),
+# not bundled with an individual app's kustomize overlay.
+#
+# Zookeeper-based (not KRaft) to match the rest of the stack: docker-compose.yml runs
+# Confluent cp-kafka/cp-zookeeper 7.4.0 the same way. Uses the stable, long-established
+# kafka.strimzi.io/v1beta2 Kafka CR schema.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: axiar-kafka
+spec:
+  kafka:
+    version: 3.6.0
+    replicas: 3
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 3
+      min.insync.replicas: 2
+      inter.broker.protocol.version: "3.6"
+    storage:
+      type: persistent-claim
+      size: 20Gi
+      deleteClaim: false
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+  zookeeper:
+    replicas: 3
+    storage:
+      type: persistent-claim
+      size: 10Gi
+      deleteClaim: false
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

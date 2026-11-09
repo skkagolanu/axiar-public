@@ -1,0 +1,19 @@
+# Combined local-CI runner: Python 3.12 (CI PYTHON_VERSION) + Node 20
+# (CI NODE_VERSION) in one image, so every CI job — backend lint/security/test
+# and the Playwright e2e job (which needs both runtimes on localhost) — runs in
+# the same interpreter/toolchain versions GitHub Actions uses. Built once by
+# scripts/local-ci.sh and reused. Playwright browsers are installed at run time
+# (into a mounted cache volume) exactly like the CI `npx playwright install` step.
+FROM python:3.12-bookworm
+
+# Node runtime for the local test runner.
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs postgresql-client \
+    && rm -f /etc/apt/sources.list.d/nodesource.list /etc/apt/sources.list.d/nodesource.sources \
+    && rm -rf /var/lib/apt/lists/*
+
+# Faithful-CI defaults; individual jobs still export the full env matrix.
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /repo

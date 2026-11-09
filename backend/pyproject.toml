@@ -1,0 +1,138 @@
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "contract: marks schemathesis-driven OpenAPI contract tests",
+]
+asyncio_mode = "auto"
+# (default_tenant_id, setup_test_database) share one event loop with the function
+# tests — otherwise their asyncpg connections live on different loops and collide
+# ("another operation is in progress").
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.black]
+line-length = 127
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["aiokafka", "aiokafka.*"]
+# aiokafka supplies annotations but does not advertise them with py.typed.
+follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "alembic.*",
+    "sqlalchemy.*",
+    "redis.*",
+    "kafka.*",
+    "stripe.*",
+    "sendgrid.*",
+    "twilio.*",
+    "googlemaps.*",
+    "jose.*",
+]
+ignore_missing_imports = true
+
+# Apply namespace-specific type-checking overrides to non-core integration packages.
+[[tool.mypy.overrides]]
+module = [
+    "app.api.*",
+    "app.consumers.*",
+    "app.domain.*",
+    "app.services.*",
+    "app.tasks.*",
+    "app.main",
+]
+ignore_errors = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations", ".venv", "venv"]
+# Selected rule exceptions for test assertions, container binds, graceful fallbacks and trusted-cache serialization.
+skips = ["B101", "B601", "B104", "B110", "B112", "B105", "B403", "B301"]
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py", "*_test.py"]
+
+[tool.isort]
+profile = "black"
+line_length = 127
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_glob = ["*/migrations/*", "*/node_modules/*"]
+
+[tool.flake8]
+max-line-length = 127
+extend-ignore = ["E203", "W503", "E501"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "migrations",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+]
+per-file-ignores = [
+    "__init__.py:F401",
+]

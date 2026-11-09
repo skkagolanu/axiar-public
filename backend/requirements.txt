@@ -1,0 +1,79 @@
+# Core Framework
+fastapi==0.139.0
+uvicorn[standard]==0.50.1
+gunicorn==24.1.1
+pydantic==2.13.4
+pydantic-settings==2.14.2
+
+# Database
+sqlalchemy[asyncio]==2.0.51
+asyncpg==0.31.0
+alembic==1.18.5
+geoalchemy2==0.20.0
+
+# Caching and Message Queue
+redis==7.4.1
+aiokafka==0.14.0
+celery==5.6.3
+
+# Authentication and Security
+PyJWT[crypto]==2.13.0
+pwdlib[bcrypt]==0.3.0
+python-multipart==0.0.32
+authlib==1.7.2
+itsdangerous==2.2.0
+
+# HTTP Client
+httpx==0.28.1
+aiohttp==3.14.3
+
+# AI integrations and their shared numerical dependencies.
+langchain==1.3.11
+langchain-ollama==1.1.0
+langchain-community==0.4.2
+pillow==12.3.0
+numpy==2.5.1  # transitive (langchain-community/ortools); pinned for reproducibility
+
+# External Services
+stripe==14.4.1
+sendgrid==6.12.5
+twilio==9.10.9
+googlemaps==4.10.0
+
+# Monitoring and Observability
+opentelemetry-api==1.43.0
+opentelemetry-sdk==1.43.0
+opentelemetry-instrumentation-fastapi==0.64b0
+opentelemetry-instrumentation-sqlalchemy==0.64b0
+opentelemetry-instrumentation-redis==0.64b0
+prometheus-client==0.25.0
+sentry-sdk[fastapi]==2.64.0
+
+# Development Tools
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+schemathesis==4.22.3
+# hypothesis-jsonschema used by this Schemathesis release needs this compatible API.
+hypothesis==6.135.9
+respx==0.22.0
+celery-types==0.26.0
+black==26.5.1
+flake8==7.3.0
+mypy==1.20.2
+pre-commit==4.6.0
+
+# Optimization
+ortools==9.15.6755
+qrcode[pil]==8.2
+
+# Speech Recognition
+SpeechRecognition==3.17.0
+
+# Additional dependencies
+email-validator==2.3.0
+python-json-logger==4.1.0
+Jinja2==3.1.6
+kombu==5.6.2
+hiredis==3.4.0
+pywebpush==2.3.0

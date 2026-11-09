@@ -1,0 +1,176 @@
+#
+# PREREQUISITE: the ECK operator itself must already be installed in this cluster
+# before applying this file -- same pattern as the Strimzi operator for Kafka
+# (kafka.yaml): it's a cluster-scoped CRD + controller, typically installed once
+# per cluster by a platform team, not bundled with an individual app's kustomize
+# overlay.
+#
+# Mirrors docker-compose.logging.yml's topology (single-node Elasticsearch +
+# Kibana + Filebeat shipping container logs) but skips Logstash: ECK's Beat CR
+# ships Filebeat straight to Elasticsearch with the same "axiar-logs-*" daily
+# index pattern logging/logstash.conf uses, without a separate parsing hop --
+# Logstash's only real job in the compose stack (tagging ERROR/CRITICAL lines)
+# can be done as a Filebeat processor instead (see below), so nothing is lost.
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: axiar-logs
+spec:
+  version: 8.11.3
+  # Single-node, no dedicated master/data split -- matches docker-compose.logging.yml's
+  # single-container Elasticsearch. Revisit (multi-node, dedicated roles) if log
+  # volume ever demands it; this is sized for "logs are visible and searchable,"
+  # not high-volume production log analytics.
+  nodeSets:
+  - name: default
+    count: 1
+    config:
+      node.store.allow_mmap: false
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+        storageClassName: standard
+    podTemplate:
+      spec:
+        containers:
+        - name: elasticsearch
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+---
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: axiar-logs
+spec:
+  version: 8.11.3
+  count: 1
+  elasticsearchRef:
+    name: axiar-logs
+  podTemplate:
+    spec:
+      containers:
+      - name: kibana
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: beat.k8s.elastic.co/v1beta1
+kind: Beat
+metadata:
+  name: axiar-filebeat
+spec:
+  type: filebeat
+  version: 8.11.3
+  elasticsearchRef:
+    name: axiar-logs
+  config:
+    filebeat.autodiscover:
+      providers:
+      - type: kubernetes
+        node: ${NODE_NAME}
+        hints.enabled: true
+        hints.default_config.type: container
+        hints.default_config.paths:
+        - /var/log/containers/*${data.kubernetes.container.id}.log
+    processors:
+    - add_kubernetes_metadata:
+        host: ${NODE_NAME}
+        matchers:
+        - logs_path:
+            logs_path: "/var/log/containers/"
+    # Logstash's logstash.conf tags ERROR/CRITICAL lines with "alert" -- same idea
+    # here as a Filebeat processor, so that behavior isn't lost by dropping Logstash.
+    - add_tags:
+        tags: [alert]
+        when:
+          regexp:
+            message: "(ERROR|CRITICAL)"
+    output.elasticsearch:
+      # ECK auto-injects the host/credentials/CA for the referenced Elasticsearch
+      # via elasticsearchRef above -- only the index pattern needs to be set here,
+      # matching logging/logstash.conf's "axiar-logs-%{+YYYY.MM.dd}" (Beats uses
+      # lowercase yyyy.MM.dd date-format tokens, same daily-rollover semantics).
+      index: "axiar-logs-%{+yyyy.MM.dd}"
+    setup.ilm.enabled: false
+    setup.template.name: "axiar-logs"
+    setup.template.pattern: "axiar-logs-*"
+  daemonSet:
+    podTemplate:
+      spec:
+        serviceAccountName: axiar-filebeat
+        automountServiceAccountToken: true
+        terminationGracePeriodSeconds: 30
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: false
+        containers:
+        - name: filebeat
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "100m"
+            limits:
+              memory: "200Mi"
+              cpu: "200m"
+          volumeMounts:
+          - name: varlogcontainers
+            mountPath: /var/log/containers
+          - name: varlogpods
+            mountPath: /var/log/pods
+          - name: varlibdockercontainers
+            mountPath: /var/lib/docker/containers
+            readOnly: true
+        volumes:
+        - name: varlogcontainers
+          hostPath:
+            path: /var/log/containers
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: axiar-filebeat
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: axiar-filebeat
+rules:
+- apiGroups: [""]
+  resources: ["namespaces", "pods", "nodes"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: axiar-filebeat
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: axiar-filebeat
+subjects:
+- kind: ServiceAccount
+  name: axiar-filebeat
+  namespace: default

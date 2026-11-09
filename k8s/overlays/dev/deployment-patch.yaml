@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: axiar-backend
+spec:
+  template:
+    spec:
+      containers:
+      - name: axiar-backend
+        image: axiar/backend:dev
+        env:
+        - name: DEBUG
+          value: "true"

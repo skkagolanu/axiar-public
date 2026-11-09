@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: axiar-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile.edge
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: DEMO_SEED
+        value: "true"
+      - key: DEMO_MODE           # simulated payments — no Stripe account anywhere
+        value: "true"
+      - key: DEMO_TENANT_SLUG
+        value: demo
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      # Render routes public traffic through Cloudflare, which overwrites this
+      # header with the real caller address. Without it every user shares the
+      # Render proxy IP's rate-limit bucket.
+      - key: RATE_LIMIT_TRUSTED_PROXY_HEADER
+        value: CF-Connecting-IP
+      # Secrets — set in the Render dashboard (sync: false = never in git):
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL          # Neon DIRECT (unpooled) connection string with
+        sync: false                # ?ssl=require — not the pooler (asyncpg prepared statements)
+      - key: DEMO_RESET_TOKEN      # guards POST /api/v1/demo/reset
+        sync: false

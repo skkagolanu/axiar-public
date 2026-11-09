@@ -1,0 +1,31 @@
+{
+  "dashboard": {
+    "title": "Axiar Backend Metrics",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "targets": [{"expr": "rate(http_requests_total[5m])"}],
+        "type": "graph"
+      },
+      {
+        "id": 2,
+        "title": "Response Time (p95)",
+        "targets": [{"expr": "histogram_quantile(0.95, http_request_duration_seconds_bucket)"}],
+        "type": "graph"
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "targets": [{"expr": "rate(http_requests_total{status=~\"5..\"}[5m])"}],
+        "type": "graph"
+      },
+      {
+        "id": 4,
+        "title": "Active WebSocket Connections",
+        "targets": [{"expr": "websocket_connections_active"}],
+        "type": "stat"
+      }
+    ]
+  }
+}

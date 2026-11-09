@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: axiar-config
+data:
+  redis-url: "redis://redis:6379"
+  # Strimzi's generated bootstrap service, named "<Kafka CR metadata.name>-kafka-bootstrap"
+  # (see kafka.yaml, metadata.name: axiar-kafka) -- not a plain "kafka:9092" like
+  # docker-compose.yml's single dev broker.
+  kafka-servers: "axiar-kafka-kafka-bootstrap:9092"
+  ollama-url: "http://ollama:11434"
+  # Overridden to "production" in overlays/prod — engages Settings.production_guard
+  # (fails fast on a short/placeholder SECRET_KEY, DEBUG=True, or wildcard hosts/CORS).
+  environment: "development"

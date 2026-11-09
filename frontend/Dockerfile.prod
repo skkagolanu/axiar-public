@@ -1,0 +1,36 @@
+# Production frontend image: multi-stage build -> nginx.
+# The dev-only Dockerfile (Dockerfile) still runs the Vite dev server for
+# docker-compose.yml's local-dev volume-mounted workflow — this is the deployable
+# artifact for staging and production deployments.
+
+# ---- Stage 1: build the static bundle ----
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+# Vite bakes VITE_* vars into the bundle at build time (see src/lib/axios.ts) --
+# there is no runtime env-injection here, so a distinct backend origin per
+# environment (staging vs prod) means building this image once per environment
+# with the matching --build-arg, not reusing one image with different runtime env.
+ARG VITE_API_URL=""
+ENV VITE_API_URL=${VITE_API_URL}
+
+RUN npm run build
+
+# ---- Stage 2: serve the static bundle ----
+FROM nginx:1.27-alpine AS production
+
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Build dirs (anchored to backend root so this never catches nested src/lib etc.)
+/lib/
+/lib64/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.mypy_cache/
+
+# Database (local)
+*.db
+*.sqlite3
+
+# AI Models / vector store
+models/
+chroma_db/
+
+# Environment
+.env
+.env.local
+.env.production
+.env.staging

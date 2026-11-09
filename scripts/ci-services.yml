@@ -1,0 +1,38 @@
+# Disposable PostgreSQL, Redis and Stripe-mock services for scripts/local-ci.sh.
+name: axiar-ci
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: axiar_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7.2-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "6379:6379"
+
+  stripe-mock:
+    image: stripe/stripe-mock:latest
+    ports:
+      - "12111:12111"
+
+# Shared, script-created network so job containers (lint/test/e2e) reach these
+# services by name regardless of compose's project-scoped default network.
+networks:
+  default:
+    external: true
+    name: axiar-ci-net

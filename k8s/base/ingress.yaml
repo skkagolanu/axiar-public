@@ -1,0 +1,61 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: axiar-backend
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.axiar.example.test
+    secretName: axiar-tls
+  rules:
+  - host: api.axiar.example.test
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: axiar-backend
+            port:
+              number: 80
+---
+# Serve the SPA and API under one configurable ingress host.
+# same-origin, no CORS/cross-origin-cookie config needed. api.axiar.example.test above stays
+# available too for direct/legacy API access; this is additive, not a replacement.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: axiar-web
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - axiar.example.test
+    secretName: axiar-web-tls
+  rules:
+  - host: axiar.example.test
+    http:
+      paths:
+      # More specific path first -- ingress-nginx matches by longest-prefix, but keep
+      # explicit ordering for readability/portability across ingress controllers.
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: axiar-backend
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: axiar-frontend
+            port:
+              number: 80

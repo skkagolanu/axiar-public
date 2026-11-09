@@ -1,0 +1,7 @@
+[flake8]
+# Native flake8 config — CI installs plain flake8, which does NOT read pyproject
+# [tool.flake8] without the flake8-pyproject plugin. Mirrors the black line length.
+max-line-length = 127
+# Use Black-compatible spacing and the project lint selection.
+extend-ignore = E203, W503, E501, F401, E402, W391, F841, E712, F541, F811
+exclude = .git, __pycache__, migrations, .venv, venv, build, dist

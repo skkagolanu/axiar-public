@@ -1,0 +1,25 @@
+# blocking voluntary disruptions (node drain, cluster upgrade) actually protects
+# availability. Single-replica statefulsets (postgres, redis, ollama) are
+# deliberately NOT given a PDB here: with replicas=1, any minAvailable/maxUnavailable
+# setting either does nothing or blocks 100% of voluntary evictions (never lets a
+# node drain), which trades a real operational hazard for no real HA benefit until
+# those components are actually made highly-available.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: axiar-backend
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: axiar-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: axiar-frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: axiar-frontend

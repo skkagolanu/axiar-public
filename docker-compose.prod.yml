@@ -1,0 +1,99 @@
+# primary production target -- see k8s/ -- this is for a single-host Docker Compose
+# deployment, or for validating production settings locally without a cluster).
+#
+# Usage:
+#   cp .env.prod.example .env.prod   # fill in real secrets, never commit the copy
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# This is an OVERRIDE file (merged on top of docker-compose.yml), not a standalone
+# compose file -- it reuses the base file's postgres/redis/kafka/zookeeper/ollama
+# service definitions and only overrides what production actually needs to differ:
+# DEBUG=false + ENVIRONMENT=production (engages Settings.production_guard, which
+# fails fast on a short/placeholder SECRET_KEY, DEBUG=True, or wildcard
+# from environment variables instead of the base file's inline `sk_test_dummy`-style
+# placeholders, the gunicorn prod entrypoint instead of `uvicorn --reload`, the
+# frontend's multi-stage Dockerfile.prod (nginx) instead of the Vite dev server, no
+# dev bind-mounts, and no host-exposed ports on the internal-only infra services
+# (postgres/redis/kafka/ollama don't need to be reachable from outside the compose
+# network -- only the backend talks to them).
+#
+# NOTE: compose override files MERGE list-type fields (ports, volumes) with the
+# base file by default -- an empty `ports: []` here does NOT clear the base
+# file's port mappings, it's simply a no-op append of nothing. Two compose-spec
+# merge tags fix this: `!reset` clears an inherited list to empty; `!override`
+# replaces it outright with the value given here. Both are used below wherever
+# a list from docker-compose.yml needs to actually change, not merge.
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env.prod}
+    ports: !reset []
+    restart: unless-stopped
+
+  redis:
+    ports: !reset []
+    restart: unless-stopped
+
+  zookeeper:
+    restart: unless-stopped
+
+  kafka:
+    ports: !reset []
+    restart: unless-stopped
+
+  ollama:
+    ports: !reset []
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DEBUG: "false"
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://axiar:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env.prod}@postgres:5432/axiar
+      REDIS_URL: redis://redis:6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      OLLAMA_BASE_URL: http://ollama:11434
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env.prod (32+ random chars)}
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:?SESSION_SECRET_KEY must be set in .env.prod (32+ random chars)}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?ALLOWED_HOSTS must be set in .env.prod (comma-separated real hosts, no wildcard)}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set in .env.prod (comma-separated real origins, no wildcard)}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL must be set in .env.prod}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY must be set in .env.prod}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET must be set in .env.prod}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:?SENDGRID_API_KEY must be set in .env.prod}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:?TWILIO_ACCOUNT_SID must be set in .env.prod}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:?TWILIO_AUTH_TOKEN must be set in .env.prod}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:?TWILIO_PHONE_NUMBER must be set in .env.prod}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:?GOOGLE_MAPS_API_KEY must be set in .env.prod}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID must be set in .env.prod}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET must be set in .env.prod}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:?MICROSOFT_CLIENT_ID must be set in .env.prod}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:?MICROSOFT_CLIENT_SECRET must be set in .env.prod}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes: !reset []
+    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL must be set in .env.prod (e.g. https://api.yourdomain.com)}
+    # VITE_API_URL is baked in at build time above (Vite/nginx, no runtime env
+    # consumption) -- the base file's runtime VITE_API_URL env var is harmless
+    # dead weight for this service but not worth a !reset just to remove a no-op.
+    #
+    # The dev Dockerfile's Vite dev server listens on 5173 (base file's port
+    # mapping); Dockerfile.prod's nginx listens on 80 (nginx.conf) -- the base
+    # "5173:5173" mapping would be pointing at a port nothing listens on, so it
+    # must be replaced (!override), not merged or just cleared (!reset).
+    ports: !override
+      - "${FRONTEND_PORT:-8080}:80"
+    volumes: !reset []
+    restart: unless-stopped

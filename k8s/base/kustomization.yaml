@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- deployment.yaml
+- service.yaml
+- configmap.yaml
+- ingress.yaml
+- hpa.yaml
+- postgres.yaml
+- redis.yaml
+- kafka.yaml
+- frontend.yaml
+- ollama.yaml
+- pdb.yaml
+- network-policies.yaml
+- elk.yaml
+
+# Apply the shared version label without modifying resource selectors.
+labels:
+- pairs:
+    version: v2.0.0
+  includeSelectors: false

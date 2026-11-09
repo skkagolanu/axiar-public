@@ -1,0 +1,42 @@
+# Compact backend image with optional integrations and demo seeding.
+FROM python:3.12-slim AS builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip==26.0.1
+
+WORKDIR /app
+ENV PATH=/root/.local/bin:$PATH
+
+COPY requirements-edge.txt .
+RUN pip install --no-cache-dir --user --root-user-action=ignore -r requirements-edge.txt
+
+FROM python:3.12-slim AS runtime
+
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r axiar && useradd -r -g axiar axiar
+
+WORKDIR /app
+
+COPY --from=builder --chown=axiar:axiar /root/.local /home/axiar/.local
+COPY --chown=axiar:axiar . .
+
+USER axiar
+ENV PATH=/home/axiar/.local/bin:$PATH
+
+# $PORT is injected by Render; default 8000 for local runs.
+ENV PORT=8000
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=30s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/v1/health || exit 1
+
+# Apply migrations and optionally seed the synthetic demo tenant at startup.
+CMD ["sh", "-c", "alembic upgrade head && { [ \"$DEMO_SEED\" = \"true\" ] && python -m scripts.seed_demo || true; } && exec gunicorn app.main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT}"]

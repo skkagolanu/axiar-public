@@ -1,0 +1,303 @@
+{
+  "measurement": "repository wall time including ORM work",
+  "fixture": {
+    "tenants": 2,
+    "bookings": 100000,
+    "booking_status": "all active"
+  },
+  "method": "30 samples per configuration; nearest-rank percentiles",
+  "revision_scope": "Two-tenant availability-query baseline/candidate comparison",
+  "change": "Replace materialization and row locks on all provider bookings with an indexed time-range overlap existence query (LIMIT 1).",
+  "configurations": {
+    "baseline": {
+      "availability": {
+        "count": 30,
+        "p50_ms": 33.13351300312206,
+        "p95_ms": 163.50051001063548,
+        "mean_ms": 82.3636199667817
+      },
+      "availability_raw_ms": [
+        152.95691700885072,
+        30.16496000054758,
+        158.60669099492952,
+        29.267635007272474,
+        31.006871999124996,
+        158.01750399987213,
+        33.178701996803284,
+        163.50051001063548,
+        35.79786799673457,
+        32.70259300188627,
+        151.62195199809503,
+        30.50224800244905,
+        30.404495002585463,
+        152.98683699802496,
+        33.549002997460775,
+        157.74905400758144,
+        32.584992004558444,
+        33.13351300312206,
+        162.33379299228545,
+        31.32192300108727,
+        32.94775899848901,
+        148.671861999901,
+        29.750620989943855,
+        162.98943500441965,
+        29.654931000550278,
+        30.64619300130289,
+        161.23557899845764,
+        32.680054995580576,
+        33.04272699460853,
+        167.90137499629054
+      ],
+      "plans": [
+        {
+          "sql": "SELECT bookings.id, bookings.tenant_id, bookings.customer_id, bookings.provider_id, bookings.service_id, bookings.field_agent_id, bookings.scheduled_time, bookings.duration_minutes, bookings.description, bookings.status, bookings.location_postcode, bookings.location_address, ST_AsBinary(bookings.location_coordinates) AS location_coordinates, bookings.route_order, bookings.base_price_cents, bookings.deposit_paid_cents, bookings.total_paid_cents, bookings.payment_timing, bookings.deposit_percentage, bookings.promo_code, bookings.discount_cents, bookings.created_at, bookings.updated_at, bookings.completed_at, bookings.version \nFROM bookings \nWHERE bookings.provider_id = $1::UUID AND bookings.status IN ($3::bookingstatus, $4::bookingstatus, $5::bookingstatus, $6::bookingstatus) AND bookings.tenant_id = $2::UUID FOR UPDATE",
+          "parameters": [
+            "1cf9119e-9822-5fe5-b097-0e146c3947a6",
+            "07c4a47e-701b-5a5d-abca-c9bae1c875ec",
+            "PENDING",
+            "CONFIRMED",
+            "ASSIGNED",
+            "IN_PROGRESS"
+          ],
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "LockRows",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 21.0,
+                "Total Cost": 2368.92,
+                "Plan Rows": 1240,
+                "Plan Width": 379,
+                "Actual Startup Time": 0.411,
+                "Actual Total Time": 3.858,
+                "Actual Rows": 2500,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 5004,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Bitmap Heap Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Relation Name": "bookings",
+                    "Alias": "bookings",
+                    "Startup Cost": 21.0,
+                    "Total Cost": 2356.52,
+                    "Plan Rows": 1240,
+                    "Plan Width": 379,
+                    "Actual Startup Time": 0.405,
+                    "Actual Total Time": 3.035,
+                    "Actual Rows": 2500,
+                    "Actual Loops": 1,
+                    "Recheck Cond": "((tenant_id = '07c4a47e-701b-5a5d-abca-c9bae1c875ec'::uuid) AND (provider_id = '1cf9119e-9822-5fe5-b097-0e146c3947a6'::uuid))",
+                    "Rows Removed by Index Recheck": 0,
+                    "Filter": "(status = ANY ('{PENDING,CONFIRMED,ASSIGNED,IN_PROGRESS}'::bookingstatus[]))",
+                    "Rows Removed by Filter": 0,
+                    "Exact Heap Blocks": 2500,
+                    "Lossy Heap Blocks": 0,
+                    "Shared Hit Blocks": 2504,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Bitmap Index Scan",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Index Name": "ix_bookings_tenant_provider_status",
+                        "Startup Cost": 0.0,
+                        "Total Cost": 20.69,
+                        "Plan Rows": 1240,
+                        "Plan Width": 0,
+                        "Actual Startup Time": 0.171,
+                        "Actual Total Time": 0.171,
+                        "Actual Rows": 2500,
+                        "Actual Loops": 1,
+                        "Index Cond": "((tenant_id = '07c4a47e-701b-5a5d-abca-c9bae1c875ec'::uuid) AND (provider_id = '1cf9119e-9822-5fe5-b097-0e146c3947a6'::uuid))",
+                        "Shared Hit Blocks": 4,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 0,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 0.118,
+              "Triggers": [],
+              "Execution Time": 4.04
+            }
+          ]
+        }
+      ]
+    },
+    "candidate": {
+      "availability": {
+        "count": 30,
+        "p50_ms": 0.6883410096634179,
+        "p95_ms": 0.820450994069688,
+        "mean_ms": 0.722923333523795
+      },
+      "availability_raw_ms": [
+        0.7753349927952513,
+        0.6538759917020798,
+        0.6995120056672022,
+        0.820450994069688,
+        0.8032379992073402,
+        0.7859860052121803,
+        0.676859010127373,
+        0.6791240011807531,
+        0.6741840043105185,
+        0.7986799901118502,
+        0.6696759955957532,
+        0.6683839892502874,
+        0.6739240052411333,
+        0.8069460018305108,
+        0.6689250003546476,
+        0.705925005604513,
+        0.7021580095170066,
+        0.7568410073872656,
+        0.7852449925849214,
+        0.6427549960790202,
+        0.698259987984784,
+        0.6823200092185289,
+        0.7828310044715181,
+        0.6388979963958263,
+        0.6744860002072528,
+        0.7815669960109517,
+        0.939666002523154,
+        0.6883410096634179,
+        0.6705470004817471,
+        0.6827600009273738
+      ],
+      "plans": [
+        {
+          "sql": "SELECT bookings.id \nFROM bookings \nWHERE bookings.provider_id = $1::UUID AND bookings.status IN ($6::bookingstatus, $7::bookingstatus, $8::bookingstatus, $9::bookingstatus, $10::bookingstatus, $11::bookingstatus, $12::bookingstatus) AND (booking_time_range(bookings.scheduled_time, bookings.duration_minutes) && booking_time_range($2::TIMESTAMP WITH TIME ZONE, $3::INTEGER)) AND bookings.tenant_id = $4::UUID \n LIMIT $5::INTEGER",
+          "parameters": [
+            "1cf9119e-9822-5fe5-b097-0e146c3947a6",
+            "2100-01-01 00:00:00+00:00",
+            60,
+            "07c4a47e-701b-5a5d-abca-c9bae1c875ec",
+            1,
+            "PENDING",
+            "CONFIRMED",
+            "ASSIGNED",
+            "ON_MY_WAY",
+            "ARRIVED",
+            "DELAYED",
+            "IN_PROGRESS"
+          ],
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "Limit",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 0.28,
+                "Total Cost": 4.61,
+                "Plan Rows": 1,
+                "Plan Width": 16,
+                "Actual Startup Time": 0.007,
+                "Actual Total Time": 0.007,
+                "Actual Rows": 0,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 1,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "no_overlapping_bookings",
+                    "Relation Name": "bookings",
+                    "Alias": "bookings",
+                    "Startup Cost": 0.28,
+                    "Total Cost": 56.57,
+                    "Plan Rows": 13,
+                    "Plan Width": 16,
+                    "Actual Startup Time": 0.006,
+                    "Actual Total Time": 0.006,
+                    "Actual Rows": 0,
+                    "Actual Loops": 1,
+                    "Index Cond": "((tenant_id = '07c4a47e-701b-5a5d-abca-c9bae1c875ec'::uuid) AND (provider_id = '1cf9119e-9822-5fe5-b097-0e146c3947a6'::uuid) AND (booking_time_range(scheduled_time, duration_minutes) && '[\"2100-01-01 00:00:00+00\",\"2100-01-01 01:00:00+00\")'::tstzrange))",
+                    "Rows Removed by Index Recheck": 0,
+                    "Shared Hit Blocks": 1,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 0,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 0.095,
+              "Triggers": [],
+              "Execution Time": 0.011
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,114 @@
+# llama3.1:8b) via the OpenAI-compatible-ish Ollama HTTP API on port 11434 --
+# configmap.yaml's ollama-url ("http://ollama:11434") already assumes a Service
+# named "ollama", matched below.
+#
+# GPU is preferred, not required: nodeAffinity uses preferredDuringScheduling (soft),
+# so this schedules on a GPU-labelled node when one exists but still runs (slower) on
+# CPU-only nodes rather than staying Pending forever -- most clusters this app targets
+# won't have a GPU node pool provisioned yet. The nvidia.com/gpu resource request is
+# commented out for the same reason: uncomment both the nodeSelector's hard variant
+# (see comment) and the resource request together once a real GPU node pool exists,
+# rather than requesting a GPU resource no node can satisfy.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      # Model weights are large (llama3.1:8b is ~4.7GB quantized) and must persist
+      # across pod restarts -- redownloading on every restart is not acceptable.
+      storage: 20Gi
+  storageClassName: standard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: gpu
+                operator: In
+                values:
+                - "true"
+      containers:
+      - name: ollama
+        image: ollama/ollama:0.3.14
+        ports:
+        - containerPort: 11434
+          name: http
+        env:
+        - name: OLLAMA_MODEL
+          value: "llama3.1:8b"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "6Gi"
+            cpu: "2000m"
+            # Uncomment once a real GPU node pool + nvidia device plugin exist:
+            # nvidia.com/gpu: 1
+        volumeMounts:
+        - name: ollama-storage
+          mountPath: /root/.ollama
+        # someone runs `ollama pull` by hand. postStart runs concurrently with the
+        # container's own entrypoint (`ollama serve`), so it waits for the server
+        # to answer before pulling -- idempotent, no-ops on restart since the model
+        # persists on the PVC already mounted above.
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                until curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; do sleep 1; done
+                ollama pull "$OLLAMA_MODEL" || echo "model pull failed -- will retry on next restart"
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: ollama-storage
+        persistentVolumeClaim:
+          claimName: ollama-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  labels:
+    app: ollama
+spec:
+  ports:
+  - port: 11434
+    targetPort: 11434
+  selector:
+    app: ollama
